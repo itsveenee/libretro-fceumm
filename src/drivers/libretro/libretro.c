@@ -4058,7 +4058,7 @@ bool retro_load_game(const struct retro_game_info *info)
 #define FB_HEIGHT NES_HEIGHT
 #endif
 
-#if defined(PS2)
+#if defined(RENDER_GSKIT_PS2)
    fceu_video_out = (uint8_t*)malloc(FB_WIDTH * FB_HEIGHT * sizeof(uint8_t));
 #else
    fceu_video_out = (bpp_t*)malloc(FB_WIDTH * FB_HEIGHT * sizeof(bpp_t));
