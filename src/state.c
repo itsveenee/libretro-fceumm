@@ -34,7 +34,7 @@
 #include "x6502.h"
 #include "fceu.h"
 #include "sound.h"
-#include "endian.h"
+#include "fceu-endian.h"
 #include "fds.h"
 #include "general.h"
 #include "state.h"
@@ -350,24 +350,43 @@ int FCEUSS_Load(char *fname) {
 	}
 }
 
-void FCEUSS_CheckStates(void) {
-	MEM_TYPE *st = NULL;
-	char *fn;
-	int ssel;
 
-	for (ssel = 0; ssel < 10; ssel++) {
-		st = FCEUD_UTF8fopen(fn = FCEU_MakeFName(FCEUMKF_STATE, ssel, 0), "rb");
-		free(fn);
-		if (st) {
-			SaveStateStatus[ssel] = 1;
-			fclose(st);
-		} else
-			SaveStateStatus[ssel] = 0;
-	}
 
-	CurrentState = 0;
-	StateShow = 0;
+void FCEUSS_CheckStates(void)
+{
+#ifdef HAVE_MEMSTREAM
+    memset(SaveStateStatus, 0, sizeof(SaveStateStatus));
+    CurrentState = 0;
+    StateShow = 0;
+#else
+    MEM_TYPE *st = NULL;
+    char *fn;
+    int ssel;
+
+    for (ssel = 0; ssel < 10; ssel++)
+    {
+        st = FCEUD_UTF8fopen(
+            fn = FCEU_MakeFName(FCEUMKF_STATE, ssel, 0),
+            "rb"
+        );
+
+        free(fn);
+
+        if (st)
+        {
+            SaveStateStatus[ssel] = 1;
+            fclose(st);
+        }
+        else
+            SaveStateStatus[ssel] = 0;
+    }
+
+    CurrentState = 0;
+    StateShow = 0;
+#endif
 }
+
+
 
 void ResetExState(void (*PreSave)(void), void (*PostSave)(void)) {
 	SPreSave = PreSave;
@@ -402,31 +421,16 @@ void FCEUI_SaveState(char *fname) {
 	FCEUSS_Save(fname);
 }
 
-void FCEUI_LoadState(char *fname) {
-	StateShow = 0;
 
-	FCEUMOV_Stop();
 
-	/* For network play, be load the state locally, and then save the state to a temporary file,
-		and send that.  This insures that if an older state is loaded that is missing some
-		information expected in newer save states, desynchronization won't occur(at least not
-		from this ;)).
-	*/
-	if (FCEUSS_Load(fname))
-		if (FCEUnetplay) {
-			char *fn = FCEU_MakeFName(FCEUMKF_NPTEMP, 0, 0);
-			MEM_TYPE *fp;
-
-			if ((fp = fopen(fn, "wb"))) {
-				if (FCEUSS_SaveFP(fp)) {
-					fclose(fp);
-					FCEUNET_SendFile(FCEUNPCMD_LOADSTATE, fn);
-				} else fclose(fp);
-				unlink(fn);
-			}
-			free(fn);
-		}
+void FCEUI_LoadState(char *fname)
+{
+    StateShow = 0;
+    FCEUMOV_Stop();
+    FCEUSS_Load(fname);
 }
+
+
 
 void FCEU_DrawSaveStates(uint8 *XBuf) {
 	if (!StateShow) return;

@@ -33,7 +33,7 @@
 #include "driver.h"
 #include "general.h"
 
-#ifndef __LIBRETRO__
+#if !defined(__LIBRETRO__) || defined(__PS2__)
 #define SUPPORTS_UNZIP_AND_GZIP
 #endif
 
@@ -42,6 +42,16 @@ typedef struct {
 	uint32 size;
 	uint32 location;
 } MEMWRAP;
+
+/* SNESTICLE_MEMORY_FILE */
+static const uint8 *g_snesticle_mem_data = 0;
+static uint32 g_snesticle_mem_size = 0;
+
+void FCEU_SetMemoryFile(const void *data, uint32 size)
+{
+    g_snesticle_mem_data = (const uint8 *)data;
+    g_snesticle_mem_size = size;
+}
 
 void ApplyIPS(FILE *ips, MEMWRAP *dest) {
 	uint8 header[5];
@@ -193,6 +203,40 @@ FCEUFILE * FCEU_fopen(const char *path, const char *ipsfn, char *mode, char *ext
 		ipsfile = FCEUD_UTF8fopen(ipsfn, "rb");
 
 	fceufp = (FCEUFILE*)malloc(sizeof(FCEUFILE));
+
+
+	/* SNESticle supplies the complete ROM image from NesRom::GetData(). */
+	if (g_snesticle_mem_data && g_snesticle_mem_size &&
+	    path && !strncmp(path, "mem:/", 5))
+	{
+		MEMWRAP *mw = (MEMWRAP*)FCEU_malloc(sizeof(MEMWRAP));
+
+		if (!mw)
+		{
+			free(fceufp);
+			return 0;
+		}
+
+		mw->data = (uint8*)FCEU_malloc(g_snesticle_mem_size);
+		if (!mw->data)
+		{
+			free(mw);
+			free(fceufp);
+			return 0;
+		}
+
+		memcpy(mw->data, g_snesticle_mem_data, g_snesticle_mem_size);
+		mw->size = g_snesticle_mem_size;
+		mw->location = 0;
+
+		fceufp->fp = mw;
+		fceufp->type = 3;
+
+		if (ipsfile)
+			fclose(ipsfile);
+
+		return fceufp;
+	}
 
 	{
 #ifdef SUPPORTS_UNZIP_AND_GZIP

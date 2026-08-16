@@ -22,6 +22,9 @@ void FCEUD_GetPalette(uint8 i, uint8 *r, uint8 *g, uint8 *b);
 void FCEUD_PrintError(char *s);
 void FCEUD_Message(char *s);
 
+/* Available in embedded/libretro frontends even without netplay. */
+void FCEUD_NetworkClose(void);
+
 #ifdef NETWORK
 /* Network interface */
 
@@ -49,7 +52,6 @@ void FCEUI_NetplayText(uint8 *text);
    should call FCEUI_NetplayStop() after it has deinitialized the network on the driver
    side.
 */
-void FCEUD_NetworkClose(void);
 #endif
 
 int FCEUI_BeginWaveRecord(char *fn);

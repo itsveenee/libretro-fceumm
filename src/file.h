@@ -16,3 +16,5 @@ int FCEU_fgetc(FCEUFILE*);
 uint64 FCEU_fgetsize(FCEUFILE*);
 int FCEU_fisarchive(FCEUFILE*);
 
+
+void FCEU_SetMemoryFile(const void *data, uint32 size);

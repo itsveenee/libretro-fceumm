@@ -38,6 +38,11 @@ static retro_input_state_t input_cb = NULL;
 static retro_audio_sample_batch_t audio_batch_cb = NULL;
 static retro_environment_t environ_cb = NULL;
 
+
+/* SNESTICLE_NO_NETPLAY
+   netplay.c is intentionally excluded from the embedded PS2 build. */
+int FCEUnetplay = 0;
+
 /* emulator-specific variables */
 
 static uint16_t palette[256];
@@ -66,12 +71,18 @@ int FCEUD_SendData(void *data, uint32 len) {
 	return 1;
 }
 
-void FCEUD_SetPalette(unsigned char index, unsigned char r, unsigned char g, unsigned char b) {
-	r >>= 3;
-	g >>= 3;
-	b >>= 3;
-	palette[index] = (r << 10) | (g << 5) | (b << 0);
+void FCEUD_SetPalette(unsigned char index,
+                      unsigned char r,
+                      unsigned char g,
+                      unsigned char b)
+{
+    /* RGB565: formato esperado pelo bridge do SNESticle. */
+    palette[index] =
+        ((uint16_t)(r & 0xF8) << 8) |
+        ((uint16_t)(g & 0xFC) << 3) |
+        ((uint16_t)b >> 3);
 }
+
 
 bool FCEUD_ShouldDrawInputAids(void) {
 	return 1;
@@ -367,7 +378,7 @@ void retro_set_environment(retro_environment_t cb) {
 }
 
 void retro_get_system_info(struct retro_system_info *info) {
-	info->need_fullpath = true;
+	info->need_fullpath = false;
 	info->valid_extensions = "fds|FDS|zip|ZIP|nes|NES|unif|UNIF";
 	info->library_version = "r88 (SVN)";
 	info->library_name = "FCEUmm";
@@ -379,12 +390,12 @@ void retro_get_system_av_info(struct retro_system_av_info *info) {
 	info->geometry.base_height = 240;
 	info->geometry.max_width = 256;
 	info->geometry.max_height = 240;
-	info->timing.sample_rate = 32050.0;
+	info->timing.sample_rate = 32000.0;
 	if (FSettings.PAL)
 		info->timing.fps = 838977920.0 / 16777215.0;
 	else
 		info->timing.fps = 1008307711.0 / 16777215.0;
-	info->timing.sample_rate = 32040.5;
+	info->timing.sample_rate = 32000.0;
 }
 
 void retro_init(void) {
@@ -421,18 +432,36 @@ static void emulator_set_custom_palette(void) {
 	}
 }
 
-static void fceu_init(const char * full_path) {
-	FCEUI_Initialize();
+static void fceu_init(const struct retro_game_info *game)
+{
+    FCEUI_Initialize();
 
-	FCEUI_SetSoundVolume(256);
-	FCEUI_Sound(32050);
+    FCEUI_SetSoundVolume(100);
+    FCEUI_Sound(32000);
 
-	GameInfo = FCEUI_LoadGame(full_path);
-	emulator_set_input();
-	emulator_set_custom_palette();
+    if (game && game->data && game->size)
+    {
+        FCEU_SetMemoryFile(game->data, (uint32)game->size);
+        GameInfo = FCEUI_LoadGame("mem:/game.nes");
+    }
+    else if (game && game->path)
+    {
+        GameInfo = FCEUI_LoadGame(game->path);
+    }
+    else
+    {
+        GameInfo = 0;
+    }
 
-	FCEUD_SoundToggle();
+    if (!GameInfo)
+        return;
+
+    emulator_set_input();
+    emulator_set_custom_palette();
+
+    FCEUD_SoundToggle();
 }
+
 
 void retro_deinit(void) {
 }
@@ -544,11 +573,12 @@ void retro_cheat_reset(void) {
 void retro_cheat_set(unsigned a, bool b, const char* c) {
 }
 
-bool retro_load_game(const struct retro_game_info *game) {
-	fceu_init(game->path);
-
-	return TRUE;
+bool retro_load_game(const struct retro_game_info *game)
+{
+    fceu_init(game);
+    return GameInfo != 0;
 }
+
 
 bool retro_load_game_special(
 	unsigned game_type,

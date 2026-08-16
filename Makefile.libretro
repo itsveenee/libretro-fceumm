@@ -69,6 +69,19 @@ else ifeq ($(platform), wii)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    PLATFORM_DEFINES := -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float
    CFLAGS += -DHAVE_ASPRINTF
+
+else ifeq ($(platform), ps2)
+   # FCEUMM_SNESTICLE_PS2
+   TARGET := fceumm_libretro_ps2.a
+   CC = mips64r5900el-ps2-elf-gcc
+   AR = mips64r5900el-ps2-elf-ar
+   ZLIB_DIR := ./src/zlib
+   ENDIANNESS_DEFINES = -DLSB_FIRST -DLOCAL_LE=1
+   PLATFORM_DEFINES := -D__PS2__ -DPS2 -D_EE -G0
+   PLATFORM_DEFINES += -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include
+   CFLAGS += -O3 -ffast-math -funroll-loops -fomit-frame-pointer
+   CFLAGS += -fstrict-aliasing -funsigned-char -fno-builtin-printf -fcommon
+
 else
    TARGET := retro.dll
    CC = gcc
@@ -89,6 +102,11 @@ FCEU_DIR := ./src
 FCEU_SRC_DIRS := $(LIBRETRO_DIR) $(FCEU_DIR) $(FCEU_DIR)/boards $(FCEU_DIR)/input $(FCEU_DIR)/mappers $(ZLIB_DIR)
 
 FCEU_CSRCS := $(foreach dir,$(FCEU_SRC_DIRS),$(wildcard $(dir)/*.c))
+
+ifeq ($(platform), ps2)
+FCEU_CSRCS := $(filter-out ./src/netplay.c,$(FCEU_CSRCS))
+endif
+
 FCEU_COBJ := $(FCEU_CSRCS:.c=.o)
 
 OBJS := $(FCEU_COBJ)
@@ -106,7 +124,7 @@ endif
 CFLAGS += $(CODE_DEFINES) $(fpic) $(WARNING_DEFINES) $(FCEU_DEFINES) $(ENDIANNESS_DEFINES)
 LDFLAGS += -lm
 
-INCDIRS := -I$(LIBRETRO_DIR) -I$(FCEU_DIR) -I$(FCEU_DIR)/input -I$(FCEU_DIR)/boards -I$(FCEU_DIR)/mappers
+INCDIRS := -I$(LIBRETRO_DIR) -I$(FCEU_DIR) -I$(FCEU_DIR)/input -I$(FCEU_DIR)/boards -I$(FCEU_DIR)/mappers -I$(ZLIB_DIR) -I$(PS2SDK)/ports/include
 LIBS :=
 
 $(TARGET): $(OBJS)
@@ -121,6 +139,8 @@ else ifeq ($(platform), xenon)
 else ifeq ($(platform), ngc)
 	$(AR) rcs $@ $(OBJS)
 else ifeq ($(platform), wii)
+	$(AR) rcs $@ $(OBJS)
+else ifeq ($(platform), ps2)
 	$(AR) rcs $@ $(OBJS)
 else
 	$(CC) -o $@ $(SHARED) $(OBJS) $(CFLAGS) $(LDFLAGS) $(LIBS)
